@@ -1,79 +1,82 @@
 const API_URL = "http://localhost:8080/api/pedido";
 
-const credentials = btoa("operador:operador123");
+const auth = {
+  username: "operador",
+  password: "operador123",
+};
 
-const getHeaders = () => ({
-  Authorization: `Basic ${credentials}`,
+const headers = {
   "Content-Type": "application/json",
-});
+  Authorization:
+    "Basic " +
+    btoa(`${auth.username}:${auth.password}`),
+};
 
-export const obtenerPedidos = async () => {
+export async function obtenerPedidos() {
   const response = await fetch(API_URL, {
-    method: "GET",
-    headers: getHeaders(),
+    headers,
   });
 
   if (!response.ok) {
-    throw new Error("No se pudieron obtener los pedidos");
+    throw new Error("Error al obtener pedidos");
   }
 
   return response.json();
-};
+}
 
-export const obtenerPedidoPorId = async (id) => {
+export async function obtenerPedidoPorId(id) {
   const response = await fetch(`${API_URL}/${id}`, {
-    method: "GET",
-    headers: getHeaders(),
+    headers,
   });
 
-  if (!response.ok) {
-    if (response.status === 404) {
-      return null;
-    }
+  if (response.status === 404) {
+    return null;
+  }
 
-    throw new Error("No se pudo obtener el pedido");
+  if (!response.ok) {
+    throw new Error("Error al obtener pedido");
   }
 
   return response.json();
-};
+}
 
-export const crearPedido = async (pedido) => {
+export async function crearPedido(pedido) {
   const response = await fetch(API_URL, {
     method: "POST",
-    headers: getHeaders(),
+    headers,
     body: JSON.stringify(pedido),
   });
 
   if (!response.ok) {
-    throw new Error("No se pudo crear el pedido");
+    throw new Error("Error al crear pedido");
   }
 
   return response.json();
-};
+}
 
-export const actualizarPedido = async (id, pedido) => {
+export async function actualizarPedido(id, pedido) {
   const response = await fetch(`${API_URL}/${id}`, {
     method: "PUT",
-    headers: getHeaders(),
+    headers,
     body: JSON.stringify(pedido),
   });
 
   if (!response.ok) {
-    throw new Error("No se pudo actualizar el pedido");
+    throw new Error("Error al actualizar pedido");
   }
 
   return response.json();
-};
+}
 
-export const eliminarPedido = async (id) => {
+export async function eliminarPedido(id) {
   const response = await fetch(`${API_URL}/${id}`, {
     method: "DELETE",
-    headers: getHeaders(),
+    headers,
   });
 
-  if (!response.ok) {
-    throw new Error("No se pudo eliminar el pedido");
+  if (!response.ok && response.status !== 204) {
+    throw new Error("Error al eliminar pedido");
   }
 
   return true;
-};
+}
