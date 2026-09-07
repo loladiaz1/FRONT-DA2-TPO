@@ -6,6 +6,7 @@ function Sidebar() {
       <span className="sidebar__title">Menu</span>
       <NavLink className="sidebar__link" to="/dashboard">Dashboard</NavLink>
       <NavLink className="sidebar__link" to="/pedidos">Pedidos</NavLink>
+      <NavLink className="sidebar__link" to="/inventario">Inventario (Hold)</NavLink>
     </aside>
   );
 }

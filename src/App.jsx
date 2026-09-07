@@ -5,6 +5,7 @@ import Pedidos from "./pages/Pedidos";
 import CrearPedido from "./pages/CrearPedido";
 import DetallePedido from "./pages/DetallePedido";
 import EditarPedido from "./pages/EditarPedido";
+import Inventario from "./pages/Inventario";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/pedidos/nuevo" element={<CrearPedido />} />
         <Route path="/pedidos/:id" element={<DetallePedido />} />
         <Route path="/pedidos/:id/editar" element={<EditarPedido />} />
+        <Route path="/inventario" element={<Inventario />} />
       </Route>
     </Routes>
   );
