@@ -1,11 +1,8 @@
+import { getAuthHeaders } from "./authService";
+
 const API_URL = "http://localhost:8080/api/inventario";
 
-const credentials = btoa("operador:operador123");
-
-const getHeaders = () => ({
-  Authorization: `Basic ${credentials}`,
-  "Content-Type": "application/json",
-});
+const getHeaders = () => getAuthHeaders();
 
 /**
  * COMPONENTE 3 STATEFUL - InventarioService

@@ -1,11 +1,8 @@
+import { getAuthHeaders } from "./authService";
+
 const API_URL = "http://localhost:8080/api/ruteo/optimizar";
 
-const credentials = btoa("operador:operador123");
-
-const getHeaders = () => ({
-  Authorization: `Basic ${credentials}`,
-  "Content-Type": "application/json",
-});
+const getHeaders = () => getAuthHeaders();
 
 /**
  * Cliente síncrono para el Servicio SOA Reutilizable: Componente 5 (RuteoService).
