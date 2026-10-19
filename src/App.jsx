@@ -8,6 +8,7 @@ import DetallePedido from "./pages/DetallePedido";
 import EditarPedido from "./pages/EditarPedido";
 import Inventario from "./pages/Inventario";
 import Login from "./pages/Login";
+import Mensajeria from "./pages/Mensajeria";
 import Pedidos from "./pages/Pedidos";
 import Register from "./pages/Register";
 
@@ -29,6 +30,7 @@ function App() {
             <Route path="/pedidos/:id" element={<DetallePedido />} />
             <Route path="/pedidos/:id/editar" element={<EditarPedido />} />
             <Route path="/inventario" element={<Inventario />} />
+            <Route path="/mensajeria" element={<Mensajeria />} />
           </Route>
         </Route>
 
