@@ -1,65 +1,67 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Loading from "../components/Loading";
-import {
-  obtenerInventario,
-  reservarStock,
-  liberarStock,
-  obtenerEstadoSesion,
-} from "../services/inventarioService";
+import { obtenerInventario, reservarStock, liberarStock } from "../services/inventarioService";
+
+const normalizarInventario = (data) => {
+  if (!Array.isArray(data)) {
+    throw new Error("La respuesta de inventario no tiene el formato esperado.");
+  }
+  return data.flatMap((producto) => (
+    Array.isArray(producto.stockPorDeposito)
+      ? producto.stockPorDeposito.map((stock, index) => ({
+        ...producto,
+        ...stock,
+        id: `${producto.id || producto.sku}-${index}`,
+        deposito: stock.deposito,
+      }))
+      : [producto]
+  ));
+};
+
+const cantidadDisponible = (item) => Number(item.disponible ?? item.stockDisponible) || 0;
+const cantidadBloqueada = (item) => Number(item.bloqueado ?? item.stockBloqueado) || 0;
 
 function Inventario() {
   const [items, setItems] = useState([]);
-  const [sesion, setSesion] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState("");
   const [feedback, setFeedback] = useState(null);
-  const [procesandoSku, setProcesandoSku] = useState(null);
+  const [procesando, setProcesando] = useState("");
 
-  const cargarDatos = async () => {
+  const cargarInventario = useCallback(async () => {
+    setLoading(true);
+    setError("");
     try {
-      setError(null);
-      const [itemsData, sesionData] = await Promise.all([
-        obtenerInventario(),
-        obtenerEstadoSesion(),
-      ]);
-      setItems(itemsData);
-      setSesion(sesionData);
-    } catch (err) {
-      setError(err.message || "Error al conectar con InventarioService en el Hub.");
+      setItems(normalizarInventario(await obtenerInventario()));
+    } catch (requestError) {
+      setError(`No se pudo cargar el inventario. ${requestError.message}`);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    cargarDatos();
   }, []);
 
-  const handleReservar = async (item) => {
-    setProcesandoSku(item.sku);
-    setFeedback(null);
-    try {
-      const res = await reservarStock(item.sku, item.deposito, 1);
-      setFeedback({ tipo: "exito", texto: res.mensaje });
-      await cargarDatos();
-    } catch (err) {
-      setFeedback({ tipo: "error", texto: err.message });
-    } finally {
-      setProcesandoSku(null);
-    }
-  };
+  useEffect(() => {
+    const timer = window.setTimeout(cargarInventario, 0);
+    return () => window.clearTimeout(timer);
+  }, [cargarInventario]);
 
-  const handleLiberar = async (item) => {
-    setProcesandoSku(item.sku);
+  const operarStock = async (item, operacion) => {
+    const key = `${item.sku}@${item.deposito}`;
+    setProcesando(key);
     setFeedback(null);
     try {
-      const res = await liberarStock(item.sku, item.deposito, 1);
-      setFeedback({ tipo: "exito", texto: res.mensaje });
-      await cargarDatos();
-    } catch (err) {
-      setFeedback({ tipo: "error", texto: err.message });
+      const result = await (operacion === "reservar"
+        ? reservarStock(item.sku, item.deposito)
+        : liberarStock(item.sku, item.deposito));
+      setFeedback({
+        tipo: "exito",
+        texto: result?.mensaje || `Operación de ${operacion} completada.`,
+      });
+      await cargarInventario();
+    } catch (requestError) {
+      setFeedback({ tipo: "error", texto: requestError.message });
     } finally {
-      setProcesandoSku(null);
+      setProcesando("");
     }
   };
 
@@ -67,172 +69,73 @@ function Inventario() {
     <section>
       <div className="page-heading">
         <div>
-          <h1>Gestión de Inventario & Depósitos</h1>
-          <p>Componente 3: InventarioService (Stateful · @SessionScope con Hold de Stock)</p>
+          <h1>Inventario</h1>
+          <p>Disponibilidad y stock bloqueado por depósito.</p>
         </div>
-        <button className="button button--secondary" onClick={cargarDatos} disabled={loading}>
-          Actualizar Datos
+        <button className="button button--secondary" type="button" onClick={cargarInventario} disabled={loading}>
+          Actualizar
         </button>
       </div>
 
-      {/* Tarjeta de Evidencia de Ciclo de Vida y Sesión Stateful */}
-      <div
-        className="form-card"
-        style={{
-          maxWidth: "100%",
-          marginBottom: "24px",
-          backgroundColor: "#f8fafc",
-          borderColor: "#cbd5e1",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-          <div>
-            <h3 style={{ fontSize: "16px", color: "var(--primary)", marginBottom: "4px" }}>
-              Estado del Componente Stateful en el Contenedor Spring
-            </h3>
-            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: 0 }}>
-              Ámbito de Inyección: <strong>@SessionScope</strong> | Ciclo de vida gestionado por anotaciones
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <span className="status-badge" style={{ backgroundColor: "#e0f2fe", color: "#0369a1" }}>
-              Sesión ID: {sesion?.idSesionConversacional || "Conectando..."}
-            </span>
-            <span className="status-badge status-badge--entregado">
-              @PostConstruct ACTIVO
-            </span>
-          </div>
-        </div>
-
-        <div style={{ marginTop: "16px", fontSize: "13px", color: "var(--text)", lineHeight: "1.6" }}>
-          <p>
-            <strong>Justificación de Diseño (Parcial 1):</strong> Este componente mantiene el estado conversacional
-            del comercio durante el armado de pedidos, bloqueando stock temporalmente (Hold). Si la sesión expira o se cierra,
-            el contenedor Spring invoca automáticamente el callback <code>@PreDestroy</code> para revertir los bloqueos huérfanos en PostgreSQL.
-          </p>
-        </div>
-
-        {sesion?.reservasActivas && Object.keys(sesion.reservasActivas).length > 0 && (
-          <div
-            style={{
-              marginTop: "14px",
-              padding: "10px 14px",
-              background: "#fef3c7",
-              borderRadius: "6px",
-              border: "1px solid #fde68a",
-              color: "#92400e",
-              fontSize: "13px",
-            }}
-          >
-            <strong>Hold de Stock activo en tu sesión actual:</strong>
-            <ul style={{ marginLeft: "20px", marginTop: "4px" }}>
-              {Object.entries(sesion.reservasActivas).map(([clave, cantidad]) => (
-                <li key={clave}>
-                  <strong>{clave}</strong>: {cantidad} unidad(es) bloqueada(s)
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+      <div className="order-preview">
+        Las reservas manuales pertenecen a la sesión del navegador y vencen a los cinco minutos.
+        No reserves manualmente antes de confirmar un pedido: el checkout ya reserva el stock.
       </div>
-
-      {feedback && (
-        <div className={`message ${feedback.tipo === "error" ? "message--error" : ""}`}>
-          {feedback.texto}
-        </div>
-      )}
-
-      {loading && <Loading message="Consultando stock en PostgreSQL..." />}
-
-      {error && (
-        <div className="message message--error">
-          {error}
-          <br />
-          <button className="button button--secondary" onClick={cargarDatos} style={{ marginTop: "8px" }}>
-            Reintentar
-          </button>
-        </div>
-      )}
-
+      {feedback && <div className={`message ${feedback.tipo === "error" ? "message--error" : ""}`}>{feedback.texto}</div>}
+      {loading && <Loading message="Consultando stock..." />}
+      {error && <div className="message message--error">{error}<button className="button button--secondary" onClick={cargarInventario}>Reintentar</button></div>}
       {!loading && !error && (
-        <div className="section">
+        <section className="section">
           <div className="section-header">
-            <h2>Stock en Depósitos (Barracas & Munro)</h2>
-            <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-              {items.length} ítems registrados en PostgreSQL
-            </span>
+            <h2>Stock por depósito</h2>
+            <span>{items.length} posiciones</span>
           </div>
-
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "14px" }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid var(--border)", color: "var(--text-secondary)" }}>
-                  <th style={{ padding: "12px 8px" }}>SKU</th>
-                  <th style={{ padding: "12px 8px" }}>Descripción</th>
-                  <th style={{ padding: "12px 8px" }}>Depósito</th>
-                  <th style={{ padding: "12px 8px", textAlign: "center" }}>Disponible</th>
-                  <th style={{ padding: "12px 8px", textAlign: "center" }}>Bloqueado (Hold)</th>
-                  <th style={{ padding: "12px 8px", textAlign: "center" }}>Operaciones Sesión</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => {
-                  const clave = `${item.sku}@${item.deposito}`;
-                  const retenidoSesion = sesion?.reservasActivas?.[clave] || 0;
-                  const isBusy = procesandoSku === item.sku;
-
-                  return (
-                    <tr key={item.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                      <td style={{ padding: "14px 8px", fontWeight: "700" }}>{item.sku}</td>
-                      <td style={{ padding: "14px 8px" }}>{item.nombre || item.descripcion}</td>
-                      <td style={{ padding: "14px 8px", color: "var(--text-secondary)" }}>{item.deposito}</td>
-                      <td style={{ padding: "14px 8px", textAlign: "center" }}>
-                        <span
-                          style={{
-                            fontWeight: "800",
-                            color: item.stockDisponible > 0 ? "var(--success)" : "var(--danger)",
-                          }}
-                        >
-                          {item.stockDisponible}
-                        </span>
-                      </td>
-                      <td style={{ padding: "14px 8px", textAlign: "center" }}>
-                        <span style={{ fontWeight: "700", color: item.stockBloqueado > 0 ? "var(--warning)" : "var(--text-secondary)" }}>
-                          {item.stockBloqueado}
-                        </span>
-                        {retenidoSesion > 0 && (
-                          <span style={{ fontSize: "11px", display: "block", color: "#b45309" }}>
-                            ({retenidoSesion} en tu sesión)
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: "14px 8px", textAlign: "center" }}>
-                        <div style={{ display: "inline-flex", gap: "8px" }}>
-                          <button
-                            className="button button--primary"
-                            style={{ padding: "6px 12px", minHeight: "32px", fontSize: "12px" }}
-                            onClick={() => handleReservar(item)}
-                            disabled={isBusy || item.stockDisponible <= 0}
-                          >
-                            {isBusy ? "..." : "+ Reservar (Hold)"}
-                          </button>
-                          <button
-                            className="button button--secondary"
-                            style={{ padding: "6px 12px", minHeight: "32px", fontSize: "12px" }}
-                            onClick={() => handleLiberar(item)}
-                            disabled={isBusy || retenidoSesion <= 0}
-                          >
-                            Liberar
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          {items.length > 0 ? (
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr><th>SKU</th><th>Producto</th><th>Depósito</th><th>Disponible</th><th>Bloqueado</th><th>Reserva manual</th></tr>
+                </thead>
+                <tbody>
+                  {items.map((item, index) => {
+                    const key = `${item.sku}@${item.deposito}`;
+                    const busy = procesando === key;
+                    const deposito = typeof item.deposito === "string" ? item.deposito : item.deposito?.nombre;
+                    return (
+                      <tr key={item.id || `${key}-${index}`}>
+                        <td>{item.sku || "—"}</td>
+                        <td>{item.nombre || item.descripcion || "—"}</td>
+                        <td>{deposito || "—"}</td>
+                        <td>{cantidadDisponible(item)}</td>
+                        <td>{cantidadBloqueada(item)}</td>
+                        <td>
+                          <div className="table-actions">
+                            <button
+                              className="button button--primary"
+                              type="button"
+                              onClick={() => operarStock(item, "reservar")}
+                              disabled={busy || cantidadDisponible(item) <= 0}
+                            >
+                              Reservar
+                            </button>
+                            <button
+                              className="button button--secondary"
+                              type="button"
+                              onClick={() => operarStock(item, "liberar")}
+                              disabled={busy}
+                            >
+                              Liberar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : <p className="empty-state">No hay existencias registradas.</p>}
+        </section>
       )}
     </section>
   );

@@ -1,5 +1,5 @@
-export const formatearPrecio = (valor) => new Intl.NumberFormat("es-AR", {
+export const formatearPrecio = (valor, moneda = "ARS") => new Intl.NumberFormat("es-AR", {
   style: "currency",
-  currency: "ARS",
-  maximumFractionDigits: 0,
+  currency: moneda || "ARS",
+  maximumFractionDigits: 2,
 }).format(Number(valor) || 0);

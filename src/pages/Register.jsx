@@ -29,11 +29,6 @@ function Register() {
       return;
     }
 
-    if (password.length < 4) {
-      setError("La contraseña debe tener al menos 4 caracteres");
-      return;
-    }
-
     setLoading(true);
 
     try {

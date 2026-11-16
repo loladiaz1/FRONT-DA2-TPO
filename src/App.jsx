@@ -3,14 +3,16 @@ import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import CrearPedido from "./pages/CrearPedido";
+import Catalogo from "./pages/Catalogo";
 import Dashboard from "./pages/Dashboard";
+import DetalleProducto from "./pages/DetalleProducto";
 import DetallePedido from "./pages/DetallePedido";
-import EditarPedido from "./pages/EditarPedido";
 import Inventario from "./pages/Inventario";
 import Login from "./pages/Login";
 import Mensajeria from "./pages/Mensajeria";
 import Pedidos from "./pages/Pedidos";
 import Register from "./pages/Register";
+import Ruteo from "./pages/Ruteo";
 
 function App() {
   return (
@@ -25,11 +27,13 @@ function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/catalogo" element={<Catalogo />} />
+            <Route path="/catalogo/:id" element={<DetalleProducto />} />
             <Route path="/pedidos" element={<Pedidos />} />
             <Route path="/pedidos/nuevo" element={<CrearPedido />} />
             <Route path="/pedidos/:id" element={<DetallePedido />} />
-            <Route path="/pedidos/:id/editar" element={<EditarPedido />} />
             <Route path="/inventario" element={<Inventario />} />
+            <Route path="/ruteo" element={<Ruteo />} />
             <Route path="/mensajeria" element={<Mensajeria />} />
           </Route>
         </Route>

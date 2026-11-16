@@ -31,12 +31,6 @@ function Login() {
     }
   };
 
-  const setDemoUser = (user, pass) => {
-    setUsername(user);
-    setPassword(pass);
-    setError(null);
-  };
-
   return (
     <div
       style={{
@@ -94,29 +88,11 @@ function Login() {
           </button>
         </form>
 
-        {/* Sección sobria para pruebas de cátedra */}
         <div style={{ marginTop: "22px", paddingTop: "16px", borderTop: "1px solid var(--border)" }}>
           <span style={{ display: "block", fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
-            Cuentas para prueba rápida:
+            Ingresá las credenciales de tu cuenta.
           </span>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button
-              type="button"
-              className="button button--secondary"
-              style={{ flex: 1, padding: "6px 8px", fontSize: "12px", minHeight: "32px" }}
-              onClick={() => setDemoUser("admin", "admin123")}
-            >
-              admin (ADMIN)
-            </button>
-            <button
-              type="button"
-              className="button button--secondary"
-              style={{ flex: 1, padding: "6px 8px", fontSize: "12px", minHeight: "32px" }}
-              onClick={() => setDemoUser("operador", "operador123")}
-            >
-              operador (OPERADOR)
-            </button>
-          </div>
+          <span className="field-hint">El registro crea una cuenta con rol OPERADOR.</span>
         </div>
 
         <div style={{ textAlign: "center", marginTop: "18px", fontSize: "13px" }}>

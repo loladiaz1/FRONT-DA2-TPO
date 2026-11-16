@@ -1,16 +1,23 @@
-# React + Vite
+# LogiRed frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interfaz web de operaciones logísticas hecha con React y Vite. Consume el backend Spring Boot en `http://localhost:8080`.
 
-Currently, two official plugins are available:
+## Desarrollo local
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```sh
+npm install
+npm run dev
+```
 
-## React Compiler
+El backend debe estar disponible en `http://localhost:8080` y permitir CORS desde el origen local de Vite.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Integración con el backend
 
-## Expanding the ESLint configuration
+- Inicio de sesión y registro usan `POST /api/auth/login` y `POST /api/auth/register`. El registro crea un usuario `OPERADOR`.
+- El login no devuelve JWT. Las solicitudes protegidas envían HTTP Basic; las credenciales se conservan codificadas en `sessionStorage` hasta cerrar la sesión del navegador.
+- Catálogo, pedidos, inventario, depósito, ruteo y eventos usan las rutas `/api/productos`, `/api/pedido`, `/api/inventario`, `/api/deposito/default`, `/api/ruteo/optimizar` y `/api/mensajeria/eventos`.
+- Las acciones de inventario envían cookies de sesión (`credentials: "include"`). Las reservas manuales vencen a los cinco minutos; el checkout de pedidos reserva stock por sí mismo.
+- El mapa utiliza Leaflet y mosaicos de OpenStreetMap. Solo marca las coordenadas del depósito proporcionadas por el backend; no geocodifica direcciones de entrega ni representa navegación real.
+- Los eventos se consultan por REST; no se establece una conexión WebSocket.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+El frontend solo envía al crear pedidos cliente, dirección y líneas (`productoId` y `cantidad`); el backend calcula el total. La edición de pedidos no está expuesta en la interfaz porque el contrato de solicitud del `PUT /api/pedido/{id}` no está documentado.

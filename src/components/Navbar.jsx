@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 function Navbar() {
@@ -10,11 +10,9 @@ function Navbar() {
     navigate("/login");
   };
 
-  const isAdmin = user?.rol === "ADMIN";
-
   return (
     <nav className="navbar" aria-label="Navegacion principal">
-      <a className="navbar__brand" href="/dashboard">LogiRed</a>
+      <Link className="navbar__brand" to="/dashboard">LogiRed</Link>
 
       {user && (
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>

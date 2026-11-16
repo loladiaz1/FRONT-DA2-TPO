@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useState } from "react";
 import {
   clearStoredUser,
   getStoredUser,
@@ -9,16 +9,7 @@ import {
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const stored = getStoredUser();
-    if (stored) {
-      setUser(stored);
-    }
-    setLoading(false);
-  }, []);
+  const [user, setUser] = useState(getStoredUser);
 
   const handleLogin = async (username, password) => {
     const loggedUser = await apiLogin(username, password);
@@ -41,7 +32,7 @@ export function AuthProvider({ children }) {
       value={{
         user,
         isAuthenticated: !!user,
-        loading,
+        loading: false,
         login: handleLogin,
         register: handleRegister,
         logout: handleLogout,
@@ -52,6 +43,8 @@ export function AuthProvider({ children }) {
   );
 }
 
+// Kept in this module so the provider and its context hook share one context instance.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

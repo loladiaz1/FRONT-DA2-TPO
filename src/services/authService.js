@@ -1,80 +1,63 @@
-const API_URL = "http://localhost:8080/api/auth";
+import { apiRequest } from "./api";
 
 const USER_STORAGE_KEY = "logired_user";
 const AUTH_STORAGE_KEY = "logired_auth";
 
-/**
- * Retorna las cabeceras HTTP necesarias para peticiones autenticadas.
- * Si hay un usuario logueado en localStorage, usa sus credenciales en Base64.
- * Si no, usa fallback a operador para no romper llamadas iniciales.
- */
 export const getAuthHeaders = () => {
-  const auth = localStorage.getItem(AUTH_STORAGE_KEY);
-  const credentials = auth || btoa("operador:operador123");
+  const credentials = sessionStorage.getItem(AUTH_STORAGE_KEY);
+  if (!credentials) {
+    throw new Error("Tu sesión expiró. Iniciá sesión nuevamente.");
+  }
 
   return {
     Authorization: `Basic ${credentials}`,
-    "Content-Type": "application/json",
   };
 };
 
 export const getStoredUser = () => {
-  const data = localStorage.getItem(USER_STORAGE_KEY);
+  const data = sessionStorage.getItem(USER_STORAGE_KEY);
   if (!data) return null;
+  if (!sessionStorage.getItem(AUTH_STORAGE_KEY)) {
+    clearStoredUser();
+    return null;
+  }
   try {
     return JSON.parse(data);
   } catch {
+    clearStoredUser();
     return null;
   }
 };
 
 export const setStoredUser = (user, password) => {
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-  if (user && password) {
-    const encoded = btoa(`${user.username}:${password}`);
-    localStorage.setItem(AUTH_STORAGE_KEY, encoded);
-  }
+  const bytes = new TextEncoder().encode(`${user.username}:${password}`);
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  sessionStorage.setItem(AUTH_STORAGE_KEY, btoa(binary));
 };
 
 export const clearStoredUser = () => {
-  localStorage.removeItem(USER_STORAGE_KEY);
-  localStorage.removeItem(AUTH_STORAGE_KEY);
+  sessionStorage.removeItem(USER_STORAGE_KEY);
+  sessionStorage.removeItem(AUTH_STORAGE_KEY);
 };
 
 export const login = async (username, password) => {
-  const response = await fetch(`${API_URL}/login`, {
+  const data = await apiRequest("/auth/login", {
+    auth: false,
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({ username, password }),
   });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.mensaje || "Credenciales inválidas");
-  }
-
   const user = { username: data.username, rol: data.rol };
   setStoredUser(user, password);
   return user;
 };
 
 export const register = async (username, password) => {
-  const response = await fetch(`${API_URL}/register`, {
+  const data = await apiRequest("/auth/register", {
+    auth: false,
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({ username, password }),
   });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.mensaje || "Error al registrar el usuario");
-  }
-
   return { username: data.username, rol: data.rol };
 };

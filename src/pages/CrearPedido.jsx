@@ -1,68 +1,96 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import Loading from "../components/Loading";
 import { crearPedido } from "../services/pedidoService";
-import { optimizarRuta } from "../services/ruteoService";
+import { obtenerProductos } from "../services/catalogoService";
+import { formatearPrecio } from "../utils/format";
+
+const nombreProducto = (producto) => producto.nombre || producto.sku;
 
 function CrearPedido() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ descripcion: "", total: "" });
-  const [error, setError] = useState("");
+  const [productos, setProductos] = useState([]);
+  const [lineas, setLineas] = useState([]);
+  const [productoId, setProductoId] = useState("");
+  const [form, setForm] = useState({ clienteNombre: "", direccionEntrega: "" });
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  // Estado del Servicio SOA de Ruteo (Componente 5 - Patrón Strategy)
-  const [origen, setOrigen] = useState("");
-  const [destino, setDestino] = useState("");
-  const [criterio, setCriterio] = useState("DISTANCIA_CORTA");
-  const [calculandoRuta, setCalculandoRuta] = useState(false);
-  const [rutaResult, setRutaResult] = useState(null);
-  const [ruteoError, setRuteoError] = useState("");
+  useEffect(() => {
+    let active = true;
+    obtenerProductos()
+      .then((data) => {
+        if (active) setProductos(data);
+      })
+      .catch((requestError) => {
+        if (active) setError(`No se pudo cargar el catálogo. ${requestError.message}`);
+      })
+      .finally(() => {
+        if (active) setLoadingProducts(false);
+      });
 
-  const handleCalcularRuta = async (e) => {
-    e.preventDefault();
-    if (!origen.trim() || !destino.trim()) {
-      setRuteoError("Ingresá origen y destino para calcular la ruta.");
-      return;
-    }
+    return () => { active = false; };
+  }, []);
 
-    setCalculandoRuta(true);
-    setRuteoError("");
-    setRutaResult(null);
+  const totalEstimado = useMemo(() => lineas.reduce((total, linea) => {
+    const producto = productos.find((item) => String(item.id) === String(linea.productoId));
+    return total + (Number(producto?.precio) || 0) * linea.cantidad;
+  }, 0), [lineas, productos]);
 
-    try {
-      const res = await optimizarRuta([origen.trim(), destino.trim()], criterio);
-      setRutaResult(res);
+  const agregarProducto = () => {
+    if (!productoId) return;
+    setLineas((current) => {
+      const existing = current.find((linea) => String(linea.productoId) === productoId);
+      if (existing) {
+        return current.map((linea) => String(linea.productoId) === productoId
+          ? { ...linea, cantidad: linea.cantidad + 1 }
+          : linea);
+      }
+      return [...current, { productoId: Number(productoId), cantidad: 1 }];
+    });
+    setError("");
+  };
 
-      // Autocompleta descripción y total sugerido en el formulario
-      const totalSugerido = Math.round((1500 + res.distanciaTotalKm * 250) * 100) / 100;
-      setForm((prev) => ({
-        ...prev,
-        descripcion: prev.descripcion || `Envío: ${origen.trim()} -> ${destino.trim()} (${res.distanciaTotalKm} km)`,
-        total: prev.total || totalSugerido,
-      }));
-    } catch {
-      setRuteoError("Error al conectar con RuteoService en el Hub.");
-    } finally {
-      setCalculandoRuta(false);
-    }
+  const actualizarCantidad = (id, cantidad) => {
+    const value = Number(cantidad);
+    if (!Number.isInteger(value) || value < 1) return;
+    setLineas((current) => current.map((linea) => String(linea.productoId) === String(id)
+      ? { ...linea, cantidad: value }
+      : linea));
+  };
+
+  const quitarProducto = (id) => {
+    setLineas((current) => current.filter((linea) => String(linea.productoId) !== String(id)));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const total = Number(form.total);
+    setError("");
+    if (lineas.length === 0) {
+      setError("Agregá al menos un producto al pedido.");
+      return;
+    }
 
-    if (!form.descripcion.trim() || !form.total || !Number.isFinite(total) || total <= 0) {
-      setError("Completa una descripción y un total mayor que 0.");
+    const stockInsuficiente = lineas.some((linea) => {
+      const producto = productos.find((item) => String(item.id) === String(linea.productoId));
+      return !producto || linea.cantidad > Number(producto.stockDisponible);
+    });
+    if (stockInsuficiente) {
+      setError("La cantidad solicitada supera el stock disponible. Actualizá el catálogo e intentá nuevamente.");
       return;
     }
 
     setSaving(true);
-    setError("");
-
     try {
-      await crearPedido({ descripcion: form.descripcion.trim(), total });
-      navigate("/pedidos");
-    } catch {
-      setError("No se pudo crear el pedido. Verifica el servidor e intenta nuevamente.");
+      const pedido = await crearPedido({
+        clienteNombre: form.clienteNombre.trim(),
+        direccionEntrega: form.direccionEntrega.trim(),
+        items: lineas.map(({ productoId: id, cantidad }) => ({ productoId: id, cantidad })),
+      });
+      navigate(`/pedidos/${pedido.id}`);
+    } catch (requestError) {
+      setError(`No se pudo crear el pedido. ${requestError.message}`);
     } finally {
       setSaving(false);
     }
@@ -72,122 +100,119 @@ function CrearPedido() {
     <section>
       <div className="page-heading">
         <div>
-          <h1>Crear nuevo pedido</h1>
-          <p>Registra un nuevo envío urbano en LogiRed integrando RuteoService (Componente 5).</p>
+          <h1>Crear pedido</h1>
+          <p>Seleccioná productos del catálogo; el backend calcula el total y reserva el stock.</p>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "24px", maxWidth: "680px" }}>
-        {/* Panel SOA: RuteoService con Patrón Strategy */}
-        <div className="section" style={{ borderLeft: "4px solid var(--primary, #0284c7)" }}>
-          <div className="section-header" style={{ marginBottom: "12px" }}>
-            <h2>RuteoService (Componente 5 · Patrón Strategy)</h2>
-          </div>
-          <p style={{ color: "var(--text-secondary, #64748b)", fontSize: "14px", marginBottom: "16px" }}>
-            Calcula la ruta óptima urbana entre paradas aplicando la estrategia seleccionada antes de confirmar el despacho.
-          </p>
+      {loadingProducts ? <Loading message="Cargando catálogo..." /> : (
+        <form className="form-card" onSubmit={handleSubmit}>
+          <label htmlFor="clienteNombre">
+            Nombre del cliente
+            <input
+              id="clienteNombre"
+              value={form.clienteNombre}
+              onChange={(event) => setForm({ ...form, clienteNombre: event.target.value })}
+              autoComplete="name"
+              required
+            />
+          </label>
 
-          <div style={{ display: "grid", gap: "12px" }}>
-            <div>
-              <label style={{ fontSize: "13px", fontWeight: "700" }}>Punto de Origen / Depósito</label>
-              <input
-                type="text"
-                placeholder="Ej: Depósito Central Barracas"
-                value={origen}
-                onChange={(e) => setOrigen(e.target.value)}
-                style={{ width: "100%", padding: "8px 12px", marginTop: "4px", borderRadius: "6px", border: "1px solid var(--border)" }}
-              />
-            </div>
+          <label htmlFor="direccionEntrega">
+            Dirección de entrega
+            <input
+              id="direccionEntrega"
+              value={form.direccionEntrega}
+              onChange={(event) => setForm({ ...form, direccionEntrega: event.target.value })}
+              placeholder="Calle, altura, localidad"
+              autoComplete="street-address"
+              required
+            />
+            <span className="field-hint">Se guarda como texto; el backend no proporciona coordenadas de entrega.</span>
+          </label>
 
-            <div>
-              <label style={{ fontSize: "13px", fontWeight: "700" }}>Punto de Destino / Cliente</label>
-              <input
-                type="text"
-                placeholder="Ej: Av. Santa Fe 2400, CABA"
-                value={destino}
-                onChange={(e) => setDestino(e.target.value)}
-                style={{ width: "100%", padding: "8px 12px", marginTop: "4px", borderRadius: "6px", border: "1px solid var(--border)" }}
-              />
-            </div>
-
-            <div>
-              <label style={{ fontSize: "13px", fontWeight: "700" }}>Estrategia de Optimización (Patrón Strategy)</label>
+          <div className="add-product">
+            <label htmlFor="productoPedido">
+              Producto
               <select
-                value={criterio}
-                onChange={(e) => setCriterio(e.target.value)}
-                style={{ width: "100%", padding: "8px 12px", marginTop: "4px", borderRadius: "6px", border: "1px solid var(--border)", background: "white" }}
+                id="productoPedido"
+                value={productoId}
+                onChange={(event) => setProductoId(event.target.value)}
+                disabled={productos.length === 0}
               >
-                <option value="DISTANCIA_CORTA">Ruta Más Corta (Ahorro de Combustible)</option>
-                <option value="TIEMPO_RAPIDO">Ruta Más Rápida (Menor Tiempo / Circunvalación)</option>
+                <option value="">Seleccioná un producto</option>
+                {productos.map((producto) => (
+                  <option
+                    key={producto.id}
+                    value={producto.id}
+                    disabled={Number(producto.stockDisponible) <= 0}
+                  >
+                    {producto.sku} · {nombreProducto(producto)} · Stock: {producto.stockDisponible}
+                  </option>
+                ))}
               </select>
-            </div>
-
-            <button
-              type="button"
-              className="button button--secondary"
-              onClick={handleCalcularRuta}
-              disabled={calculandoRuta}
-              style={{ marginTop: "8px" }}
-            >
-              {calculandoRuta ? "Calculando con Strategy..." : "Calcular Ruta Óptima (SOA)"}
+            </label>
+            <button type="button" className="button button--secondary" onClick={agregarProducto} disabled={!productoId}>
+              Agregar producto
             </button>
-
-            {ruteoError && <p className="message message--error" style={{ marginTop: "10px" }}>{ruteoError}</p>}
-
-            {rutaResult && (
-              <div style={{ marginTop: "12px", padding: "12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <strong style={{ color: "#166534" }}>{rutaResult.estrategiaAplicada}</strong>
-                  <span style={{ fontSize: "18px", fontWeight: "800", color: "#15803d" }}>{rutaResult.distanciaTotalKm} km</span>
-                </div>
-                <div style={{ fontSize: "13px", color: "#166534", marginTop: "6px" }}>
-                  Tiempo estimado: {rutaResult.tiempoEstimadoMinutos} min · {rutaResult.mensaje}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
 
-        {/* Formulario de Pedido */}
-        <form className="form-card" onSubmit={handleSubmit} style={{ maxWidth: "100%" }}>
-          <label htmlFor="descripcion">
-            Descripción del Pedido
-            <input
-              id="descripcion"
-              name="descripcion"
-              value={form.descripcion}
-              onChange={(event) => setForm({ ...form, descripcion: event.target.value })}
-              placeholder="Ej: Despacho de insumos urbanos"
-              required
-            />
-          </label>
+          {lineas.length > 0 && (
+            <div className="order-lines">
+              <h2>Productos del pedido</h2>
+              {lineas.map((linea) => {
+                const producto = productos.find((item) => String(item.id) === String(linea.productoId));
+                if (!producto) return null;
+                const stock = Number(producto.stockDisponible) || 0;
+                const excedeStock = linea.cantidad > stock;
+                return (
+                  <div className="order-line" key={linea.productoId}>
+                    <div>
+                      <strong>{nombreProducto(producto)}</strong>
+                      <span>{producto.sku} · {formatearPrecio(producto.precio, producto.moneda)} c/u · Stock: {stock}</span>
+                    </div>
+                    <label className="order-line__quantity" htmlFor={`cantidad-${producto.id}`}>
+                      Cantidad
+                      <input
+                        id={`cantidad-${producto.id}`}
+                        type="number"
+                        min="1"
+                        value={linea.cantidad}
+                        onChange={(event) => actualizarCantidad(producto.id, event.target.value)}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="button button--danger-link"
+                      onClick={() => quitarProducto(producto.id)}
+                      aria-label={`Quitar ${nombreProducto(producto)}`}
+                    >
+                      Quitar
+                    </button>
+                    {excedeStock && <span className="field-hint field-hint--error">Stock insuficiente.</span>}
+                  </div>
+                );
+              })}
+              <p className="order-estimate">
+                Estimación informativa: <strong>{formatearPrecio(totalEstimado)}</strong>
+                <span>El total definitivo lo calcula el backend.</span>
+              </p>
+            </div>
+          )}
 
-          <label htmlFor="total">
-            Total ($)
-            <input
-              id="total"
-              name="total"
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={form.total}
-              onChange={(event) => setForm({ ...form, total: event.target.value })}
-              required
-            />
-          </label>
-
+          <p className="order-preview">
+            Al confirmar, el backend valida el stock y lo reserva como parte del checkout. No reserves stock manualmente antes.
+          </p>
           {error && <p className="message message--error">{error}</p>}
 
           <div className="form-actions">
-            <Link className="button button--secondary" to="/pedidos">
-              Cancelar
-            </Link>
-            <button className="button button--primary" type="submit" disabled={saving}>
-              {saving ? "Creando..." : "Crear pedido"}
+            <Link className="button button--secondary" to="/pedidos">Cancelar</Link>
+            <button className="button button--primary" type="submit" disabled={saving || loadingProducts}>
+              {saving ? "Creando..." : "Confirmar pedido"}
             </button>
           </div>
         </form>
-      </div>
+      )}
     </section>
   );
 }
