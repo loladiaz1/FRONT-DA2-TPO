@@ -7,6 +7,7 @@ import Catalogo from "./pages/Catalogo";
 import Dashboard from "./pages/Dashboard";
 import DetalleProducto from "./pages/DetalleProducto";
 import DetallePedido from "./pages/DetallePedido";
+import FormularioProducto from "./pages/FormularioProducto";
 import Inventario from "./pages/Inventario";
 import Login from "./pages/Login";
 import Mensajeria from "./pages/Mensajeria";
@@ -28,10 +29,13 @@ function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/catalogo" element={<Catalogo />} />
+            <Route path="/catalogo/nuevo" element={<FormularioProducto />} />
             <Route path="/catalogo/:id" element={<DetalleProducto />} />
+            <Route path="/catalogo/:id/editar" element={<FormularioProducto />} />
             <Route path="/pedidos" element={<Pedidos />} />
             <Route path="/pedidos/nuevo" element={<CrearPedido />} />
             <Route path="/pedidos/:id" element={<DetallePedido />} />
+            <Route path="/pedidos/:id/editar" element={<CrearPedido />} />
             <Route path="/inventario" element={<Inventario />} />
             <Route path="/ruteo" element={<Ruteo />} />
             <Route path="/mensajeria" element={<Mensajeria />} />

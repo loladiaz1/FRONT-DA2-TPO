@@ -92,7 +92,7 @@ function Login() {
           <span style={{ display: "block", fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
             Ingresá las credenciales de tu cuenta.
           </span>
-          <span className="field-hint">El registro crea una cuenta con rol OPERADOR.</span>
+          <span className="field-hint">El registro crea una cuenta con rol OPERADOR. La cuenta administrativa es admin / admin123 y solo ella puede eliminar registros.</span>
         </div>
 
         <div style={{ textAlign: "center", marginTop: "18px", fontSize: "13px" }}>

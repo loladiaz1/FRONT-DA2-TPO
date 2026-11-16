@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Loading from "../components/Loading";
-import { obtenerProductos } from "../services/catalogoService";
+import { useAuth } from "../context/AuthContext";
+import { eliminarProducto, obtenerProductos } from "../services/catalogoService";
+import { canDeleteRecords } from "../services/authService";
 import { formatearPrecio } from "../utils/format";
 
 const nombreVendedor = (vendedor) => (
@@ -9,9 +11,11 @@ const nombreVendedor = (vendedor) => (
 );
 
 function Catalogo() {
+  const { user } = useAuth();
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
 
   const cargarProductos = useCallback(async () => {
     setLoading(true);
@@ -25,6 +29,19 @@ function Catalogo() {
     }
   }, []);
 
+  const confirmarEliminacion = async (id) => {
+    if (!canDeleteRecords(user)) return;
+    setDeletingId(id);
+    try {
+      await eliminarProducto(id);
+      setProductos((actuales) => actuales.filter((producto) => String(producto.id) !== String(id)));
+    } catch (requestError) {
+      setError(`No se pudo eliminar el producto. ${requestError.message}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   useEffect(() => {
     const timer = window.setTimeout(cargarProductos, 0);
     return () => window.clearTimeout(timer);
@@ -37,6 +54,7 @@ function Catalogo() {
           <h1>Catálogo</h1>
           <p>Productos, vendedores, precios y disponibilidad informados por el backend.</p>
         </div>
+        <Link className="button button--primary" to="/catalogo/nuevo">+ Nuevo producto</Link>
       </div>
       {loading && <Loading message="Cargando productos..." />}
       {error && <div className="message message--error">{error}<button className="button button--secondary" onClick={cargarProductos}>Reintentar</button></div>}
@@ -56,7 +74,20 @@ function Catalogo() {
                 <div><dt>Stock disponible</dt><dd>{producto.stockDisponible}</dd></div>
                 <div><dt>Stock bloqueado</dt><dd>{producto.stockBloqueado}</dd></div>
               </dl>
-              <Link className="button button--secondary" to={`/catalogo/${producto.id}`}>Ver detalle</Link>
+              <div className="form-actions">
+                <Link className="button button--secondary" to={`/catalogo/${producto.id}`}>Ver detalle</Link>
+                <Link className="button button--secondary" to={`/catalogo/${producto.id}/editar`}>Editar</Link>
+                {canDeleteRecords(user) && (
+                  <button
+                    type="button"
+                    className="button button--danger-link"
+                    onClick={() => confirmarEliminacion(producto.id)}
+                    disabled={deletingId === producto.id}
+                  >
+                    {deletingId === producto.id ? "Eliminando..." : "Eliminar"}
+                  </button>
+                )}
+              </div>
             </article>
           ))}
           {productos.length === 0 && <p className="empty-state">No hay productos disponibles.</p>}

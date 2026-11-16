@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import Loading from "../components/Loading";
-import { crearPedido } from "../services/pedidoService";
+import { actualizarPedido, crearPedido, obtenerPedidoPorId } from "../services/pedidoService";
 import { obtenerProductos } from "../services/catalogoService";
 import { formatearPrecio } from "../utils/format";
 
 const nombreProducto = (producto) => producto.nombre || producto.sku;
 
 function CrearPedido() {
+  const { id } = useParams();
+  const isEditing = Boolean(id);
   const navigate = useNavigate();
   const [productos, setProductos] = useState([]);
   const [lineas, setLineas] = useState([]);
@@ -21,17 +23,60 @@ function CrearPedido() {
     let active = true;
     obtenerProductos()
       .then((data) => {
-        if (active) setProductos(data);
+        if (!active) return;
+        setProductos(data);
+        if (isEditing) {
+          return obtenerPedidoPorId(id);
+        }
+        return null;
+      })
+      .then((pedido) => {
+        if (!active || !pedido || !isEditing) return;
+        setForm({
+          clienteNombre: pedido.clienteNombre || "",
+          direccionEntrega: pedido.direccionEntrega || "",
+        });
+        const itemsActuales = pedido.items || [];
+        const cantidadesReservadas = new Map();
+        itemsActuales.forEach((item) => {
+          const itemId = item.productoId ?? item.producto?.id;
+          if (itemId != null) {
+            const key = String(itemId);
+            cantidadesReservadas.set(key, (cantidadesReservadas.get(key) || 0) + (Number(item.cantidad) || 0));
+          }
+        });
+        setLineas(itemsActuales.map((item) => ({
+          productoId: item.productoId ?? item.producto?.id,
+          cantidad: Number(item.cantidad) || 1,
+        })));
+        setProductos((actuales) => {
+          const porId = new Map(actuales.map((producto) => [String(producto.id), producto]));
+          itemsActuales.forEach((item) => {
+            const producto = item.producto;
+            const itemId = item.productoId ?? producto?.id;
+            if (itemId == null) return;
+            const key = String(itemId);
+            const disponible = Number(porId.get(key)?.stockDisponible) || 0;
+            const datosProducto = porId.get(key) || producto;
+            if (datosProducto) {
+              porId.set(key, {
+                ...datosProducto,
+                stockDisponible: disponible + (cantidadesReservadas.get(key) || 0),
+              });
+            }
+          });
+          return [...porId.values()];
+        });
       })
       .catch((requestError) => {
-        if (active) setError(`No se pudo cargar el catálogo. ${requestError.message}`);
+        if (active) setError(`No se pudo cargar el pedido o el catálogo. ${requestError.message}`);
       })
       .finally(() => {
         if (active) setLoadingProducts(false);
       });
 
     return () => { active = false; };
-  }, []);
+  }, [id, isEditing]);
 
   const totalEstimado = useMemo(() => lineas.reduce((total, linea) => {
     const producto = productos.find((item) => String(item.id) === String(linea.productoId));
@@ -83,14 +128,17 @@ function CrearPedido() {
 
     setSaving(true);
     try {
-      const pedido = await crearPedido({
+      const payload = {
         clienteNombre: form.clienteNombre.trim(),
         direccionEntrega: form.direccionEntrega.trim(),
-        items: lineas.map(({ productoId: id, cantidad }) => ({ productoId: id, cantidad })),
-      });
-      navigate(`/pedidos/${pedido.id}`);
+        items: lineas.map(({ productoId: itemId, cantidad }) => ({ productoId: itemId, cantidad })),
+      };
+      const pedido = isEditing
+        ? await actualizarPedido(id, payload)
+        : await crearPedido(payload);
+      navigate(`/pedidos/${pedido.id || id}`);
     } catch (requestError) {
-      setError(`No se pudo crear el pedido. ${requestError.message}`);
+      setError(`No se pudo ${isEditing ? "guardar" : "crear"} el pedido. ${requestError.message}`);
     } finally {
       setSaving(false);
     }
@@ -100,7 +148,7 @@ function CrearPedido() {
     <section>
       <div className="page-heading">
         <div>
-          <h1>Crear pedido</h1>
+          <h1>{isEditing ? "Editar pedido" : "Crear pedido"}</h1>
           <p>Seleccioná productos del catálogo; el backend calcula el total y reserva el stock.</p>
         </div>
       </div>
@@ -208,7 +256,7 @@ function CrearPedido() {
           <div className="form-actions">
             <Link className="button button--secondary" to="/pedidos">Cancelar</Link>
             <button className="button button--primary" type="submit" disabled={saving || loadingProducts}>
-              {saving ? "Creando..." : "Confirmar pedido"}
+              {saving ? (isEditing ? "Guardando..." : "Creando...") : (isEditing ? "Guardar cambios" : "Confirmar pedido")}
             </button>
           </div>
         </form>

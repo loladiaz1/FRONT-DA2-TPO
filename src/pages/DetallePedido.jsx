@@ -5,6 +5,7 @@ import Loading from "../components/Loading";
 import MapaDeposito from "../components/MapaDeposito";
 import StatusBadge from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
+import { canDeleteRecords } from "../services/authService";
 import { eliminarPedido, obtenerPedidoPorId } from "../services/pedidoService";
 import { formatearPrecio } from "../utils/format";
 
@@ -59,7 +60,7 @@ function DetallePedido() {
     return <div className="empty-state"><h2>Pedido no encontrado</h2><Link className="button button--primary" to="/pedidos">Volver a pedidos</Link></div>;
   }
 
-  const isAdmin = user?.rol === "ADMIN";
+  const canDelete = canDeleteRecords(user);
 
   return (
     <section>
@@ -104,13 +105,21 @@ function DetallePedido() {
 
         <section className="section">
           <div className="section-header"><h2>Ubicación del depósito</h2></div>
-          <MapaDeposito depositoPedido={nombreDeposito(pedido.deposito) === "—" ? "" : nombreDeposito(pedido.deposito)} />
+          <MapaDeposito depositoPedido={pedido.deposito} />
+          {pedido.mapaEntregaUrl && (
+            <p>
+              <a href={pedido.mapaEntregaUrl} target="_blank" rel="noreferrer">
+                Buscar dirección de entrega en OpenStreetMap
+              </a>
+            </p>
+          )}
           <p className="field-hint">La dirección de entrega es texto; el backend no proporciona coordenadas ni una ruta vial real.</p>
         </section>
 
         <div className="form-actions">
           <Link className="button button--secondary" to="/pedidos">Volver</Link>
-          {isAdmin && (
+          <Link className="button button--secondary" to={`/pedidos/${id}/editar`}>Editar pedido</Link>
+          {canDelete && (
             <button className="button button--danger" type="button" onClick={() => setShowModal(true)} disabled={deleting}>
               Eliminar pedido
             </button>

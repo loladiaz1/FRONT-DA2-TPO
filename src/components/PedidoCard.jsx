@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import StatusBadge from "./StatusBadge";
 import { formatearPrecio } from "../utils/format";
 import { useAuth } from "../context/AuthContext";
+import { canDeleteRecords } from "../services/authService";
 
 const nombreDeposito = (deposito) => (
   typeof deposito === "string" ? deposito : deposito?.nombre || "—"
@@ -9,7 +10,7 @@ const nombreDeposito = (deposito) => (
 
 function PedidoCard({ pedido, onDelete }) {
   const { user } = useAuth();
-  const isAdmin = user?.rol === "ADMIN";
+  const canDelete = canDeleteRecords(user);
 
   return (
     <article className="pedido-card">
@@ -26,7 +27,8 @@ function PedidoCard({ pedido, onDelete }) {
       <p className="pedido-card__total">{formatearPrecio(pedido.total)}</p>
       <div className="pedido-card__actions">
         <Link className="button button--secondary" to={`/pedidos/${pedido.id}`}>Ver detalle</Link>
-        {isAdmin && (
+        <Link className="button button--secondary" to={`/pedidos/${pedido.id}/editar`}>Editar</Link>
+        {canDelete && (
           <button className="button button--danger-link" type="button" onClick={() => onDelete(pedido)}>
             Eliminar
           </button>
