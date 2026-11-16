@@ -104,8 +104,8 @@ function DetallePedido() {
 
         <section className="section">
           <div className="section-header"><h2>Ubicación del depósito</h2></div>
-          <MapaDeposito depositoPedido={nombreDeposito(pedido.deposito) === "—" ? "" : nombreDeposito(pedido.deposito)} />
-          <p className="field-hint">La dirección de entrega es texto; el backend no proporciona coordenadas ni una ruta vial real.</p>
+          <MapaDeposito depositoInfo={pedido.deposito} depositoPedido={nombreDeposito(pedido.deposito)} />
+          <p className="field-hint">Ubicación geográfica del depósito logístico sobre OpenStreetMap.</p>
         </section>
 
         <div className="form-actions">

@@ -4,6 +4,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import Loading from "../components/Loading";
 import PedidoCard from "../components/PedidoCard";
 import StatCard from "../components/StatCard";
+import MapaDeposito from "../components/MapaDeposito";
 import { eliminarPedido, obtenerPedidos } from "../services/pedidoService";
 
 function Dashboard() {
@@ -39,6 +40,13 @@ function Dashboard() {
       {!loading && !error && <>
         <div className="stats"><StatCard label="Total de pedidos" value={pedidos.length} /><StatCard label="Pedidos creados" value={pedidos.filter((pedido) => pedido.estado === "CREADO").length} /><StatCard label="Entregados" value={pedidos.filter((pedido) => pedido.estado === "ENTREGADO").length} /></div>
         <section className="section"><div className="section-header"><h2>Pedidos recientes</h2><Link to="/pedidos">Ver todos</Link></div><div className="pedido-list">{pedidos.slice(-5).reverse().map((pedido) => <PedidoCard key={pedido.id} pedido={pedido} onDelete={setPedidoAEliminar} />)}</div>{pedidos.length === 0 && <p className="empty-state">Todavia no hay pedidos registrados.</p>}</section>
+        <section className="section">
+          <div className="section-header">
+            <h2>Base Operativa y Depósito Central</h2>
+            <span>CABA · Cobertura Última Milla</span>
+          </div>
+          <MapaDeposito />
+        </section>
       </>}
       {pedidoAEliminar && <ConfirmModal pedidoId={pedidoAEliminar.id} onCancel={() => setPedidoAEliminar(null)} onConfirm={confirmarEliminacion} loading={deleting} />}
     </section>

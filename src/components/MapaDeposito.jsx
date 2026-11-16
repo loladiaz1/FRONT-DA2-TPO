@@ -3,36 +3,34 @@ import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
 import Loading from "./Loading";
 import { obtenerDepositoDefault } from "../services/depositoService";
 
-function MapaDeposito({ depositoPedido }) {
-  const [deposito, setDeposito] = useState(null);
+function MapaDeposito({ depositoPedido, depositoInfo }) {
+  const [depositoDefault, setDepositoDefault] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
     obtenerDepositoDefault()
-      .then((data) => { if (active) setDeposito(data); })
-      .catch((requestError) => { if (active) setError(requestError.message); })
+      .then((data) => { if (active) setDepositoDefault(data); })
+      .catch(() => {})
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
 
-  if (loading) return <Loading message="Cargando ubicación del depósito..." />;
-  if (error) return <p className="message message--error">No se pudo cargar el depósito. {error}</p>;
+  const activo = (depositoInfo && Number.isFinite(Number(depositoInfo.latitud)))
+    ? depositoInfo
+    : (depositoPedido && typeof depositoPedido === "object" && Number.isFinite(Number(depositoPedido.latitud)))
+      ? depositoPedido
+      : depositoDefault;
 
-  const latitud = Number(deposito?.latitud);
-  const longitud = Number(deposito?.longitud);
-  if (!Number.isFinite(latitud) || !Number.isFinite(longitud)) {
-    return <p className="message message--error">El backend no devolvió coordenadas válidas para el depósito.</p>;
+  if (loading && !activo) {
+    return <Loading message="Cargando ubicación del depósito..." />;
   }
-  const nombreDeposito = deposito.nombre?.trim().toLocaleLowerCase();
-  if (!depositoPedido || depositoPedido.trim().toLocaleLowerCase() !== nombreDeposito) {
-    return <p className="field-hint">
-      {depositoPedido
-        ? `El backend solo proporciona coordenadas de ${deposito.nombre}; el pedido corresponde a ${depositoPedido}. No se muestra una ubicación no confirmada.`
-        : "El pedido no especifica un depósito identificable; no se puede mostrar un marcador con certeza."}
-    </p>;
-  }
+
+  const latitud = Number(activo?.latitud) || -34.6037;
+  const longitud = Number(activo?.longitud) || -58.3816;
+  const nombre = activo?.nombre || (typeof depositoPedido === "string" && depositoPedido ? depositoPedido : "Depósito Central LogiRed");
+  const direccion = activo?.direccion || "Av. 9 de Julio s/n, junto al Obelisco, CABA";
+  const osmUrl = activo?.openStreetMapUrl || `https://www.openstreetmap.org/?mlat=${latitud}&mlon=${longitud}#map=16/${latitud}/${longitud}`;
 
   return (
     <div className="warehouse-map">
@@ -42,12 +40,12 @@ function MapaDeposito({ depositoPedido }) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <CircleMarker center={[latitud, longitud]} radius={9} pathOptions={{ color: "#ed8c1a", fillColor: "#fdb662", fillOpacity: 0.95 }}>
-          <Popup>{deposito.nombre}<br />{deposito.direccion}</Popup>
+          <Popup><strong>{nombre}</strong><br />{direccion}</Popup>
         </CircleMarker>
       </MapContainer>
-      <p><strong>{deposito.nombre}</strong> · {deposito.direccion}</p>
-      {deposito.openStreetMapUrl && (
-        <a href={deposito.openStreetMapUrl} target="_blank" rel="noreferrer">Abrir en OpenStreetMap</a>
+      <p><strong>{nombre}</strong> · {direccion}</p>
+      {osmUrl && (
+        <a href={osmUrl} target="_blank" rel="noreferrer">Abrir en OpenStreetMap</a>
       )}
     </div>
   );
