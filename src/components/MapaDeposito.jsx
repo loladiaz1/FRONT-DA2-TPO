@@ -3,34 +3,49 @@ import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
 import Loading from "./Loading";
 import { obtenerDepositoDefault } from "../services/depositoService";
 
+const normalizarTexto = (valor = "") => String(valor)
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .trim()
+  .replace(/\s+/g, " ")
+  .toLocaleLowerCase();
+
+const tieneCoordenadas = (ubicacion) => (
+  ubicacion
+  && ubicacion.latitud != null
+  && ubicacion.longitud != null
+  && Number.isFinite(Number(ubicacion.latitud))
+  && Number.isFinite(Number(ubicacion.longitud))
+);
+
 function MapaDeposito({ depositoPedido, depositoInfo }) {
-  const [depositoDefault, setDepositoDefault] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [depositoPredeterminado, setDepositoPredeterminado] = useState(null);
+  const infoDirecta = tieneCoordenadas(depositoInfo) ? depositoInfo : tieneCoordenadas(depositoPedido) ? depositoPedido : null;
+  const [loading, setLoading] = useState(!infoDirecta);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    obtenerDepositoDefault()
-      .then((data) => { if (active) setDepositoDefault(data); })
-      .catch(() => {})
-      .finally(() => { if (active) setLoading(false); });
+    if (!infoDirecta) {
+      obtenerDepositoDefault()
+        .then((data) => { if (active) setDepositoPredeterminado(data); })
+        .catch((requestError) => { if (active) setError(requestError.message); })
+        .finally(() => { if (active) setLoading(false); });
+    }
     return () => { active = false; };
-  }, []);
+  }, [infoDirecta]);
 
-  const activo = (depositoInfo && Number.isFinite(Number(depositoInfo.latitud)))
-    ? depositoInfo
-    : (depositoPedido && typeof depositoPedido === "object" && Number.isFinite(Number(depositoPedido.latitud)))
-      ? depositoPedido
-      : depositoDefault;
+  const deposito = infoDirecta || depositoPredeterminado;
 
-  if (loading && !activo) {
-    return <Loading message="Cargando ubicación del depósito..." />;
-  }
+  if (loading && !deposito) return <Loading message="Cargando ubicación del depósito..." />;
+  if (error && !deposito) return <p className="message message--error">No se pudo cargar el depósito. {error}</p>;
+  if (!deposito) return <p className="message message--error">No hay información del depósito para mostrar.</p>;
 
-  const latitud = Number(activo?.latitud) || -34.6037;
-  const longitud = Number(activo?.longitud) || -58.3816;
-  const nombre = activo?.nombre || (typeof depositoPedido === "string" && depositoPedido ? depositoPedido : "Depósito Central LogiRed");
-  const direccion = activo?.direccion || "Av. 9 de Julio s/n, junto al Obelisco, CABA";
-  const osmUrl = activo?.openStreetMapUrl || `https://www.openstreetmap.org/?mlat=${latitud}&mlon=${longitud}#map=16/${latitud}/${longitud}`;
+  const latitud = Number(deposito?.latitud) || -34.6037;
+  const longitud = Number(deposito?.longitud) || -58.3816;
+  const nombre = deposito?.nombre || "Depósito Central LogiRed";
+  const direccion = deposito?.direccion || "Av. 9 de Julio s/n, junto al Obelisco, CABA";
+  const osmUrl = deposito?.openStreetMapUrl || `https://www.openstreetmap.org/?mlat=${latitud}&mlon=${longitud}#map=16/${latitud}/${longitud}`;
 
   return (
     <div className="warehouse-map">

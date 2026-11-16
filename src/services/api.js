@@ -34,7 +34,7 @@ export async function apiRequest(path, options = {}) {
 
   if (!response.ok) {
     const message = typeof data === "object" && data
-      ? data.mensaje || data.message
+        ? data.mensaje || data.message || data.error
       : data;
     const error = new Error(`${message || "La solicitud no pudo completarse"} (HTTP ${response.status})`);
     error.status = response.status;

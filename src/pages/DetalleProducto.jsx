@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import Loading from "../components/Loading";
-import { obtenerProductoPorId } from "../services/catalogoService";
+import { useAuth } from "../context/AuthContext";
+import { canDeleteRecords } from "../services/authService";
+import { eliminarProducto, obtenerProductoPorId } from "../services/catalogoService";
 import { formatearPrecio } from "../utils/format";
 
 function DetalleProducto() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [producto, setProducto] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -18,6 +23,19 @@ function DetalleProducto() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [id]);
+
+  const handleDelete = async () => {
+    if (!canDeleteRecords(user)) return;
+    setDeleting(true);
+    try {
+      await eliminarProducto(id);
+      navigate("/catalogo");
+    } catch (requestError) {
+      setError(`No se pudo eliminar el producto. ${requestError.message}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (loading) return <Loading message="Cargando producto..." />;
   if (error) return <div className="message message--error">{error}<p><Link to="/catalogo">Volver al catálogo</Link></p></div>;
@@ -34,7 +52,15 @@ function DetalleProducto() {
           <h1>{producto.nombre}</h1>
           <p>{producto.sku} · {producto.categoria || "Sin categoría"}</p>
         </div>
-        <Link className="button button--secondary" to="/catalogo">Volver al catálogo</Link>
+        <div className="form-actions">
+          <Link className="button button--secondary" to="/catalogo">Volver al catálogo</Link>
+          <Link className="button button--secondary" to={`/catalogo/${id}/editar`}>Editar</Link>
+          {canDeleteRecords(user) && (
+            <button type="button" className="button button--danger" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Eliminando..." : "Eliminar producto"}
+            </button>
+          )}
+        </div>
       </div>
       <article className="detail-card product-detail">
         <p>{producto.descripcion || "Sin descripción disponible."}</p>
