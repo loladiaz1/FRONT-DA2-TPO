@@ -4,6 +4,10 @@ export const obtenerInventario = async () => {
   return apiRequest("/inventario", { credentials: "include" });
 };
 
+export const obtenerEstadoSesionInventario = async () => {
+  return apiRequest("/inventario/sesion", { credentials: "include" });
+};
+
 export const reservarStock = async (sku, deposito, cantidad = 1) => {
   const result = await apiRequest("/inventario/reservar", {
     method: "POST",

@@ -6,8 +6,17 @@ import MapaDeposito from "../components/MapaDeposito";
 import StatusBadge from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
 import { canDeleteRecords } from "../services/authService";
-import { eliminarPedido, obtenerPedidoPorId } from "../services/pedidoService";
+import { cambiarEstadoPedido, eliminarPedido, obtenerPedidoPorId } from "../services/pedidoService";
 import { formatearPrecio } from "../utils/format";
+
+const accionesPorEstado = {
+  CREADO: [{ accion: "ASIGNAR", label: "Asignar pedido" }],
+  ASIGNADO: [{ accion: "EN_RUTA", label: "Marcar en ruta" }],
+  EN_RUTA: [
+    { accion: "ENTREGAR", label: "Marcar entregado" },
+    { accion: "FALLAR", label: "Reportar falla" },
+  ],
+};
 
 const nombreProducto = (producto) => (
   typeof producto === "string" ? producto : producto?.nombre || producto?.sku || "Producto"
@@ -26,7 +35,9 @@ function DetallePedido() {
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [changingStatus, setChangingStatus] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -41,14 +52,31 @@ function DetallePedido() {
     return () => { active = false; };
   }, [id]);
 
+  const cambiarEstado = async (accion) => {
+    setChangingStatus(true);
+    setMessage("");
+    setMessageIsError(false);
+    try {
+      setPedido(await cambiarEstadoPedido(id, accion));
+      setMessage("Estado del pedido actualizado correctamente.");
+    } catch (requestError) {
+      setMessage(`No se pudo actualizar el estado. ${requestError.message}`);
+      setMessageIsError(true);
+    } finally {
+      setChangingStatus(false);
+    }
+  };
+
   const borrar = async () => {
     setDeleting(true);
     setMessage("");
+    setMessageIsError(false);
     try {
       await eliminarPedido(id);
       navigate("/pedidos");
     } catch (requestError) {
       setMessage(`No se pudo eliminar el pedido. ${requestError.message}`);
+      setMessageIsError(true);
       setDeleting(false);
       setShowModal(false);
     }
@@ -61,6 +89,8 @@ function DetallePedido() {
   }
 
   const canDelete = canDeleteRecords(user);
+  const puedeGestionarEstado = ["ADMIN", "OPERADOR"].includes(user?.rol);
+  const accionesEstado = accionesPorEstado[pedido.estado] || [];
 
   return (
     <section>
@@ -71,12 +101,13 @@ function DetallePedido() {
         </div>
         <StatusBadge estado={pedido.estado} />
       </div>
-      {message && <p className="message message--error">{message}</p>}
+      {message && <p className={`message${messageIsError ? " message--error" : ""}`}>{message}</p>}
       <article className="detail-card order-detail">
         <dl>
           <div><dt>Estado</dt><dd><StatusBadge estado={pedido.estado} /></dd></div>
           <div><dt>Cliente</dt><dd>{pedido.clienteNombre || "—"}</dd></div>
           <div><dt>Dirección de entrega</dt><dd>{pedido.direccionEntrega || "—"}</dd></div>
+          <div><dt>Descripción</dt><dd>{pedido.descripcion || "—"}</dd></div>
           <div><dt>Depósito de despacho</dt><dd>{nombreDeposito(pedido.deposito)}</dd></div>
           <div><dt>Total</dt><dd className="detail-total">{formatearPrecio(pedido.total)}</dd></div>
         </dl>
@@ -104,21 +135,32 @@ function DetallePedido() {
         </section>
 
         <section className="section">
-          <div className="section-header"><h2>Ubicación del depósito</h2></div>
-          <MapaDeposito depositoPedido={pedido.deposito} />
-          {pedido.mapaEntregaUrl && (
-            <p>
-              <a href={pedido.mapaEntregaUrl} target="_blank" rel="noreferrer">
-                Buscar dirección de entrega en OpenStreetMap
-              </a>
-            </p>
-          )}
-          <p className="field-hint">Ubicación geográfica del depósito logístico sobre OpenStreetMap.</p>
+          <div className="section-header"><h2>Depósito y recorrido de entrega</h2></div>
+          <MapaDeposito
+            depositoPedido={pedido.deposito}
+            direccionEntrega={pedido.direccionEntrega}
+            latitudEntrega={pedido.latitudEntrega}
+            longitudEntrega={pedido.longitudEntrega}
+            privado
+          />
         </section>
 
         <div className="form-actions">
           <Link className="button button--secondary" to="/pedidos">Volver</Link>
-          <Link className="button button--secondary" to={`/pedidos/${id}/editar`}>Editar pedido</Link>
+          {pedido.estado === "CREADO" && (
+            <Link className="button button--secondary" to={`/pedidos/${id}/editar`}>Editar pedido</Link>
+          )}
+          {puedeGestionarEstado && accionesEstado.map(({ accion, label }) => (
+            <button
+              className={accion === "FALLAR" ? "button button--danger" : "button button--primary"}
+              type="button"
+              key={accion}
+              onClick={() => cambiarEstado(accion)}
+              disabled={changingStatus}
+            >
+              {changingStatus ? "Actualizando..." : label}
+            </button>
+          ))}
           {canDelete && (
             <button className="button button--danger" type="button" onClick={() => setShowModal(true)} disabled={deleting}>
               Eliminar pedido

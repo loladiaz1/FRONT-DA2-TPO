@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Loading from "../components/Loading";
+import MapaDeposito from "../components/MapaDeposito";
 import { actualizarPedido, crearPedido, obtenerPedidoPorId } from "../services/pedidoService";
 import { obtenerProductos } from "../services/catalogoService";
 import { formatearPrecio } from "../utils/format";
@@ -14,7 +15,12 @@ function CrearPedido() {
   const [productos, setProductos] = useState([]);
   const [lineas, setLineas] = useState([]);
   const [productoId, setProductoId] = useState("");
-  const [form, setForm] = useState({ clienteNombre: "", direccionEntrega: "" });
+  const [form, setForm] = useState({
+    clienteNombre: "",
+    direccionEntrega: "",
+    latitudEntrega: "",
+    longitudEntrega: "",
+  });
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -35,6 +41,8 @@ function CrearPedido() {
         setForm({
           clienteNombre: pedido.clienteNombre || "",
           direccionEntrega: pedido.direccionEntrega || "",
+          latitudEntrega: pedido.latitudEntrega ?? "",
+          longitudEntrega: pedido.longitudEntrega ?? "",
         });
         const itemsActuales = pedido.items || [];
         const cantidadesReservadas = new Map();
@@ -109,9 +117,26 @@ function CrearPedido() {
     setLineas((current) => current.filter((linea) => String(linea.productoId) !== String(id)));
   };
 
+  const seleccionarEntrega = ({ latitud, longitud }) => {
+    setForm((actual) => ({
+      ...actual,
+      latitudEntrega: latitud,
+      longitudEntrega: longitud,
+    }));
+    setError("");
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    const latitudEntrega = Number(form.latitudEntrega);
+    const longitudEntrega = Number(form.longitudEntrega);
+    if (form.latitudEntrega === "" || form.longitudEntrega === ""
+        || !Number.isFinite(latitudEntrega) || latitudEntrega < -90 || latitudEntrega > 90
+        || !Number.isFinite(longitudEntrega) || longitudEntrega < -180 || longitudEntrega > 180) {
+      setError("Seleccioná en el mapa el punto de entrega antes de confirmar el pedido.");
+      return;
+    }
     if (lineas.length === 0) {
       setError("Agregá al menos un producto al pedido.");
       return;
@@ -131,6 +156,8 @@ function CrearPedido() {
       const payload = {
         clienteNombre: form.clienteNombre.trim(),
         direccionEntrega: form.direccionEntrega.trim(),
+        latitudEntrega,
+        longitudEntrega,
         items: lineas.map(({ productoId: itemId, cantidad }) => ({ productoId: itemId, cantidad })),
       };
       const pedido = isEditing
@@ -171,13 +198,34 @@ function CrearPedido() {
             <input
               id="direccionEntrega"
               value={form.direccionEntrega}
-              onChange={(event) => setForm({ ...form, direccionEntrega: event.target.value })}
+              onChange={(event) => setForm((actual) => ({
+                ...actual,
+                direccionEntrega: event.target.value,
+                latitudEntrega: "",
+                longitudEntrega: "",
+              }))}
               placeholder="Calle, altura, localidad"
               autoComplete="street-address"
               required
             />
-            <span className="field-hint">Se guarda como texto; el backend no proporciona coordenadas de entrega.</span>
+            <span className="field-hint">La dirección se guarda como texto. Elegí el punto de entrega en el mapa para trazar el recorrido.</span>
           </label>
+
+          <section className="section">
+            <div className="section-header"><h2>Ubicación de entrega</h2></div>
+            <MapaDeposito
+              direccionEntrega={form.direccionEntrega}
+              latitudEntrega={form.latitudEntrega}
+              longitudEntrega={form.longitudEntrega}
+              onSeleccionarEntrega={seleccionarEntrega}
+              privado
+            />
+            <p className="field-hint">
+              {form.latitudEntrega !== "" && form.longitudEntrega !== ""
+                ? `Punto seleccionado: ${Number(form.latitudEntrega).toFixed(5)}, ${Number(form.longitudEntrega).toFixed(5)}`
+                : "Todavía no seleccionaste un punto de entrega."}
+            </p>
+          </section>
 
           <div className="add-product">
             <label htmlFor="productoPedido">

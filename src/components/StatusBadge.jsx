@@ -1,5 +1,9 @@
 const statusLabels = {
   CREADO: "Creado",
+  ASIGNADO: "Asignado",
+  EN_RUTA: "En ruta",
+  FALLIDO: "Fallido",
+  // Keep the older labels readable for records created by earlier frontend versions.
   EN_PREPARACION: "En preparacion",
   EN_CAMINO: "En camino",
   ENTREGADO: "Entregado",

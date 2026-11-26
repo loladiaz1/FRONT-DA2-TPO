@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Loading from "../components/Loading";
+import { useAuth } from "../context/AuthContext";
 import { obtenerEventosMensajeria } from "../services/mensajeriaService";
 
 function Mensajeria() {
+  const { user } = useAuth();
   const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -23,13 +25,26 @@ function Mensajeria() {
   }, []);
 
   useEffect(() => {
+    if (user?.rol !== "ADMIN") {
+      return undefined;
+    }
+
     const timer = window.setTimeout(cargarEventos, 0);
     const interval = window.setInterval(cargarEventos, 15000);
     return () => {
       window.clearTimeout(timer);
       window.clearInterval(interval);
     };
-  }, [cargarEventos]);
+  }, [cargarEventos, user?.rol]);
+
+  if (user?.rol !== "ADMIN") {
+    return (
+      <section>
+        <h1>Acceso restringido</h1>
+        <p className="message message--error">Solo los administradores pueden consultar los eventos de mensajería.</p>
+      </section>
+    );
+  }
 
   return (
     <section>
@@ -51,7 +66,7 @@ function Mensajeria() {
         {eventos.map((evento, index) => (
           <article className="pedido-card" key={evento.id || `${evento.timestamp}-${index}`}>
             <div className="pedido-card__header">
-              <strong>{evento.suscriptor || evento.tipo || "Evento"}</strong>
+              <strong>{evento.icono && <span aria-hidden="true">{evento.icono} </span>}{evento.suscriptor || evento.tipo || "Evento"}</strong>
               {evento.timestamp && <time>{evento.timestamp}</time>}
             </div>
             {evento.accion && <p>{evento.accion}</p>}

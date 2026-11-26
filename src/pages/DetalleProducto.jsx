@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import MapaDeposito from "../components/MapaDeposito";
 import Loading from "../components/Loading";
 import { useAuth } from "../context/AuthContext";
 import { canDeleteRecords } from "../services/authService";
@@ -66,10 +67,20 @@ function DetalleProducto() {
         <p>{producto.descripcion || "Sin descripción disponible."}</p>
         <dl>
           <div><dt>Vendedor</dt><dd>{vendedor}</dd></div>
+          {producto.vendedor?.email && <div><dt>Email del vendedor</dt><dd>{producto.vendedor.email}</dd></div>}
+          {producto.vendedor?.descripcion && <div><dt>Información del vendedor</dt><dd>{producto.vendedor.descripcion}</dd></div>}
           <div><dt>Precio</dt><dd>{formatearPrecio(producto.precio, producto.moneda)}</dd></div>
           <div><dt>Stock disponible total</dt><dd>{producto.stockDisponible}</dd></div>
           <div><dt>Stock bloqueado total</dt><dd>{producto.stockBloqueado}</dd></div>
+          {producto.ubicacion?.nombre && <div><dt>Depósito de referencia</dt><dd>{producto.ubicacion.nombre}</dd></div>}
+          {producto.ubicacion?.direccion && <div><dt>Dirección del depósito</dt><dd>{producto.ubicacion.direccion}</dd></div>}
         </dl>
+        {producto.ubicacion && (
+          <section className="section">
+            <div className="section-header"><h2>Ubicación del producto</h2></div>
+            <MapaDeposito depositoInfo={producto.ubicacion} />
+          </section>
+        )}
         <section className="section">
           <div className="section-header"><h2>Stock por depósito</h2></div>
           {producto.stockPorDeposito?.length ? (

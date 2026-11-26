@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Loading from "../components/Loading";
-import { obtenerInventario, reservarStock, liberarStock } from "../services/inventarioService";
+import {
+  liberarStock,
+  obtenerEstadoSesionInventario,
+  obtenerInventario,
+  reservarStock,
+} from "../services/inventarioService";
 
 const normalizarInventario = (data) => {
   if (!Array.isArray(data)) {
@@ -25,6 +30,8 @@ function Inventario() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [estadoSesion, setEstadoSesion] = useState(null);
+  const [errorSesion, setErrorSesion] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [procesando, setProcesando] = useState("");
 
@@ -40,10 +47,22 @@ function Inventario() {
     }
   }, []);
 
+  const cargarEstadoSesion = useCallback(async () => {
+    setErrorSesion("");
+    try {
+      setEstadoSesion(await obtenerEstadoSesionInventario());
+    } catch (requestError) {
+      setErrorSesion(`No se pudo consultar la sesión de inventario. ${requestError.message}`);
+    }
+  }, []);
+
   useEffect(() => {
-    const timer = window.setTimeout(cargarInventario, 0);
+    const timer = window.setTimeout(() => {
+      cargarInventario();
+      cargarEstadoSesion();
+    }, 0);
     return () => window.clearTimeout(timer);
-  }, [cargarInventario]);
+  }, [cargarEstadoSesion, cargarInventario]);
 
   const operarStock = async (item, operacion) => {
     const key = `${item.sku}@${item.deposito}`;
@@ -58,6 +77,7 @@ function Inventario() {
         texto: result?.mensaje || `Operación de ${operacion} completada.`,
       });
       await cargarInventario();
+      await cargarEstadoSesion();
     } catch (requestError) {
       setFeedback({ tipo: "error", texto: requestError.message });
     } finally {
@@ -82,6 +102,23 @@ function Inventario() {
         No reserves manualmente antes de confirmar un pedido: el checkout ya reserva el stock.
       </div>
       {feedback && <div className={`message ${feedback.tipo === "error" ? "message--error" : ""}`}>{feedback.texto}</div>}
+      {errorSesion && <div className="message message--error">{errorSesion}</div>}
+      {estadoSesion && (
+        <section className="section">
+          <div className="section-header">
+            <h2>Sesión de inventario</h2>
+            <span>{estadoSesion.tipoComponente}</span>
+          </div>
+          <p>ID de sesión: <strong>{estadoSesion.idSesionConversacional || "—"}</strong></p>
+          {Object.entries(estadoSesion.reservasActivas || {}).length > 0 ? (
+            <ul className="route-stops">
+              {Object.entries(estadoSesion.reservasActivas).map(([reserva, cantidad]) => (
+                <li key={reserva}>{reserva} · {cantidad} unidad(es) reservada(s)</li>
+              ))}
+            </ul>
+          ) : <p className="empty-state">No hay reservas manuales activas en esta sesión.</p>}
+        </section>
+      )}
       {loading && <Loading message="Consultando stock..." />}
       {error && <div className="message message--error">{error}<button className="button button--secondary" onClick={cargarInventario}>Reintentar</button></div>}
       {!loading && !error && (

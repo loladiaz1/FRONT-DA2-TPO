@@ -27,6 +27,12 @@ export const actualizarPedido = async (id, pedido) => {
   });
 };
 
+export const cambiarEstadoPedido = async (id, accion) => {
+  return apiRequest(`/pedido/${id}/estado?accion=${encodeURIComponent(accion)}`, {
+    method: "PATCH",
+  });
+};
+
 export const eliminarPedido = async (id) => {
   await apiRequest(`/pedido/${id}`, { method: "DELETE" });
   return true;

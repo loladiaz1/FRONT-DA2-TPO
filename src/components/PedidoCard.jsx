@@ -27,7 +27,9 @@ function PedidoCard({ pedido, onDelete }) {
       <p className="pedido-card__total">{formatearPrecio(pedido.total)}</p>
       <div className="pedido-card__actions">
         <Link className="button button--secondary" to={`/pedidos/${pedido.id}`}>Ver detalle</Link>
-        <Link className="button button--secondary" to={`/pedidos/${pedido.id}/editar`}>Editar</Link>
+        {pedido.estado === "CREADO" && (
+          <Link className="button button--secondary" to={`/pedidos/${pedido.id}/editar`}>Editar</Link>
+        )}
         {canDelete && (
           <button className="button button--danger-link" type="button" onClick={() => onDelete(pedido)}>
             Eliminar
