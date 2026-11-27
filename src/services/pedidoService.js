@@ -1,11 +1,8 @@
+import { getAuthHeaders } from "./authService";
+
 const API_URL = "http://localhost:8080/api/pedido";
 
-const credentials = btoa("operador:operador123");
-
-const getHeaders = () => ({
-  Authorization: `Basic ${credentials}`,
-  "Content-Type": "application/json",
-});
+const getHeaders = () => getAuthHeaders();
 
 export const obtenerPedidos = async () => {
   const response = await fetch(API_URL, {
