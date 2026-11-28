@@ -5,6 +5,10 @@ import MapaDeposito from "../components/MapaDeposito";
 import { actualizarPedido, crearPedido, obtenerPedidoPorId } from "../services/pedidoService";
 import { obtenerProductos } from "../services/catalogoService";
 import { formatearPrecio } from "../utils/format";
+import {
+  DIRECCIONES_PREDEFINIDAS,
+  buscarCoordenadasPorDireccion,
+} from "../utils/direccionesPredefinidas";
 
 const nombreProducto = (producto) => producto.nombre || producto.sku;
 
@@ -126,15 +130,51 @@ function CrearPedido() {
     setError("");
   };
 
+  const handleDireccionChange = (nuevaDireccion) => {
+    const match = buscarCoordenadasPorDireccion(nuevaDireccion);
+    setForm((actual) => ({
+      ...actual,
+      direccionEntrega: nuevaDireccion,
+      latitudEntrega: match ? match.latitud : actual.latitudEntrega,
+      longitudEntrega: match ? match.longitud : actual.longitudEntrega,
+    }));
+    setError("");
+  };
+
+  const seleccionarDireccionRapida = (item) => {
+    setForm((actual) => ({
+      ...actual,
+      direccionEntrega: item.direccionCompleta,
+      latitudEntrega: item.latitud,
+      longitudEntrega: item.longitud,
+    }));
+    setError("");
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
-    const latitudEntrega = Number(form.latitudEntrega);
-    const longitudEntrega = Number(form.longitudEntrega);
-    if (form.latitudEntrega === "" || form.longitudEntrega === ""
+    let latitudEntrega = Number(form.latitudEntrega);
+    let longitudEntrega = Number(form.longitudEntrega);
+
+    // Si aún no se marcaron las coordenadas, intentar resolverlas por catálogo
+    if (form.latitudEntrega === "" || form.longitudEntrega === "") {
+      const match = buscarCoordenadasPorDireccion(form.direccionEntrega);
+      if (match) {
+        latitudEntrega = match.latitud;
+        longitudEntrega = match.longitud;
+        setForm((actual) => ({
+          ...actual,
+          latitudEntrega: match.latitud,
+          longitudEntrega: match.longitud,
+        }));
+      }
+    }
+
+    if (form.latitudEntrega === "" && !Number.isFinite(latitudEntrega)
         || !Number.isFinite(latitudEntrega) || latitudEntrega < -90 || latitudEntrega > 90
         || !Number.isFinite(longitudEntrega) || longitudEntrega < -180 || longitudEntrega > 180) {
-      setError("Seleccioná en el mapa el punto de entrega antes de confirmar el pedido.");
+      setError("Seleccioná en el mapa o en las sugerencias el punto de entrega antes de confirmar el pedido.");
       return;
     }
     if (lineas.length === 0) {
@@ -197,33 +237,56 @@ function CrearPedido() {
             Dirección de entrega
             <input
               id="direccionEntrega"
+              list="direcciones-sugeridas"
               value={form.direccionEntrega}
-              onChange={(event) => setForm((actual) => ({
-                ...actual,
-                direccionEntrega: event.target.value,
-                latitudEntrega: "",
-                longitudEntrega: "",
-              }))}
-              placeholder="Calle, altura, localidad"
+              onChange={(event) => handleDireccionChange(event.target.value)}
+              placeholder="Ej: Av. Federico Lacroze 3496, Colegiales"
               autoComplete="street-address"
               required
             />
-            <span className="field-hint">La dirección se guarda como texto. Elegí el punto de entrega en el mapa para trazar el recorrido.</span>
+            <datalist id="direcciones-sugeridas">
+              {DIRECCIONES_PREDEFINIDAS.map((item) => (
+                <option key={item.id} value={item.direccionCompleta}>
+                  {item.barrio} ({item.latitud}, {item.longitud})
+                </option>
+              ))}
+            </datalist>
+            <span className="field-hint">
+              Escribí la dirección (se autocompleta con las 10 ubicaciones de CABA) o elegí un punto en el mapa.
+            </span>
           </label>
 
+          <div style={{ margin: "4px 0 16px 0" }}>
+            <span style={{ fontSize: "12px", color: "var(--text-secondary)", display: "block", marginBottom: "6px" }}>
+              📍 Direcciones frecuentes de entrega (clic para autocompletar):
+            </span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {DIRECCIONES_PREDEFINIDAS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="button button--secondary"
+                  style={{ fontSize: "11px", padding: "4px 8px" }}
+                  onClick={() => seleccionarDireccionRapida(item)}
+                >
+                  {item.direccion} ({item.barrio})
+                </button>
+              ))}
+            </div>
+          </div>
+
           <section className="section">
-            <div className="section-header"><h2>Ubicación de entrega</h2></div>
+            <div className="section-header"><h2>Ubicación y recorrido de entrega</h2></div>
             <MapaDeposito
               direccionEntrega={form.direccionEntrega}
               latitudEntrega={form.latitudEntrega}
               longitudEntrega={form.longitudEntrega}
               onSeleccionarEntrega={seleccionarEntrega}
-              privado
             />
-            <p className="field-hint">
+            <p className="field-hint" style={{ marginTop: "6px" }}>
               {form.latitudEntrega !== "" && form.longitudEntrega !== ""
                 ? `Punto seleccionado: ${Number(form.latitudEntrega).toFixed(5)}, ${Number(form.longitudEntrega).toFixed(5)}`
-                : "Todavía no seleccionaste un punto de entrega."}
+                : "Hacé clic en el mapa o seleccioná una dirección arriba para marcar la entrega."}
             </p>
           </section>
 

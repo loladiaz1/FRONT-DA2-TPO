@@ -141,7 +141,6 @@ function DetallePedido() {
             direccionEntrega={pedido.direccionEntrega}
             latitudEntrega={pedido.latitudEntrega}
             longitudEntrega={pedido.longitudEntrega}
-            privado
           />
         </section>
 
